@@ -1,0 +1,235 @@
+<html>
+
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script src="resources/underscore/underscore-min.js"></script>
+    <script src="resources/mom/moment.js"></script>
+    <title>Forge Ink Metrics</title>
+    <style>
+        html, body {
+            font-family: sans-serif;
+            text-align: center;
+        }
+        #mainContainer {
+            display:-moz-inline-stack;
+            display: inline-block;
+        }
+
+        .mainLogo {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            width: 450px;
+            height: 175px;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-image: url('/Forged/resources/images/forge_bw.svg');
+        }
+
+        .boxer {
+            display: table;
+            border-collapse: collapse;
+        }
+
+        .boxer .box-row {
+            display: table-row;
+        }
+
+        .boxer .box {
+            display: table-cell;
+            vertical-align: middle;
+            border: 1px solid black;
+            margin: 4px;
+            padding: 4px 8px;
+        }
+
+        .title {
+            text-align: center;
+            font-weight: bold;
+        }
+        .machine {
+            background-color: rgba(204,255,255,.5);
+        }
+        .machineMait {
+            background-color: rgba(255,204,255,.5);
+        }
+        .analog {
+            background-color: rgba(255,255,204,.5);
+        }
+        .cpl {
+            display: inline-block;
+            width: 60px;
+            margin: 4px;
+            padding: 4px;
+            text-align: center;
+        }
+        .inkType {
+            text-align: center;
+            font-size: .5em;
+        }
+        .downloadExcel{
+            float:right;
+            margin: 2px;
+            border-radius: 2px;
+            padding: 2px;
+        }
+
+        .white {
+            background-color: #fff;
+        }
+
+    </style>
+</head>
+
+<body>
+
+<div class="mainLogo"></div>
+<div id="mainContainer">
+    <h2>Ink Metrics - April 2016</h2>
+<div class="boxer">
+    <div class="box-row">
+        <div class="box title">Machine</div>
+        <div class="box title">Cost/Liter</div>
+        <div class="box title">SqFt Produced</div>
+        <div class="box title">Print Time<br> <span class="inkType">Hours : Minutes</span></div>
+        <div class="box title machine">Ink Consumption (L)<br> <span class="inkType">Jobs Only</span></div>
+        <div class="box title machine">mL/SqFt<br> <span class="inkType">Color Only</span></div>
+        <div class="box title machine">Cost/SqFt<br> <span class="inkType">Color Only</span></div>
+        <div class="box title machineMait">Ink Consumption (L)<br> <span class="inkType">Maintenance & Jobs</span></div>
+        <div class="box title machineMait">mL/SqFt<br> <span class="inkType">Color Only</span></div>
+        <div class="box title machineMait">Cost/SqFt<br> <span class="inkType">Color Only</span></div>
+        <div class="box title analog">Ink Consumption (L)<br> <span class="inkType">Ink Logs</span></div>
+        <div class="box title analog">mL/SqFt<br> <span class="inkType">Color Only</span></div>
+        <div class="box title analog">Cost/SqFt<br> <span class="inkType">Color Only</span></div>
+    </div>
+</div>
+<br />
+<button class="downloadExcel">
+    <span style="vertical-align: middle; line-height: 2em;">Download Excel &nbsp;</span><img style="vertical-align: middle; height: 2em; width: auto" src="images/excel.svg"/>
+</button>
+
+</div>
+
+<script>
+//Global Vars
+var costConfig;
+
+//Helper Functions
+//Make numbers money, allows us to keep backend accuracy
+function money_round(num, res=2) {
+    if (!isNaN(num)) {
+        try {
+          return "$"+num.toFixed(res);
+        }    
+        catch(err) {
+          console.log (err);
+          return "N/A";
+        }
+    }
+    else {
+        return "N/A";
+    }
+}
+
+function round2(num) {
+    if ((Math.round(num * 100) / 100) > 0 ) {
+        return Math.round(num * 100) / 100;
+    }
+    else if (num === 0) {
+        return num;
+    }
+
+    else {return "N/A";}
+}
+
+function toLiter(mL) {
+    return (mL * 0.001);
+}
+
+//Load information
+
+$.getJSON("resources/inkMetrics/config.json",
+    function(data) {
+        data.totalConsumption = 0;
+        for (var a = data.length - 1; a >= 0; a--) {
+            for (var b = data[a].machineCosts.length - 1; b >= 0; b--) {
+                data[a].machineCosts[b].costPerL = data[a].machineCosts[b].cost/(data[a].machineCosts[b].volume * .001);
+                data[a].machineCosts[b].costPerML = data[a].machineCosts[b].cost/(data[a].machineCosts[b].volume);
+            };
+            color = _.findWhere(data[a].machineCosts, {channel: "Colors"});
+            data.totalConsumption += Number(data[a].machineConsumption.sqFt);
+            if (data[a].machineConsumption.machine != undefined) {
+                data[a].machineConsumption.machine.mlSqft = data[a].machineConsumption.machine.totalCMYK / data[a].machineConsumption.sqFt;
+                data[a].machineConsumption.machine.costSqFt =  (data[a].machineConsumption.machine.totalCMYK / data[a].machineConsumption.sqFt) * color.costPerML;
+            }
+            if (data[a].machineConsumption.human != undefined) {
+                data[a].machineConsumption.human.mlSqft = data[a].machineConsumption.human.totalCMYK / data[a].machineConsumption.sqFt;
+                data[a].machineConsumption.human.costSqFt =  (data[a].machineConsumption.human.totalCMYK / data[a].machineConsumption.sqFt) * color.costPerML;
+            }
+            if (data[a].machineConsumption.machineMait != undefined) {
+                data[a].machineConsumption.machineMait.mlSqft = data[a].machineConsumption.machineMait.totalCMYK / data[a].machineConsumption.sqFt;
+                data[a].machineConsumption.machineMait.costSqFt =  (data[a].machineConsumption.machineMait.totalCMYK / data[a].machineConsumption.sqFt) * color.costPerML;
+            }
+            data[a].machineConsumption.time = moment.duration(Number(data[a].machineConsumption.time), 'minutes');
+        };
+        costConfig = _.sortBy(data, 'machineIndex');
+        costConfig.totalConsumption = data.totalConsumption;
+
+        //Populate table
+        for (var i = 0; i < costConfig.length; i++) {
+            $row = $('<div class="box-row"> <div data-col="1" class="box"></div> <div data-col="2" class="box"></div> <div data-col="3" class="box"></div> <div data-col="4" class="box"></div> <div data-col="5" class="box machine"></div> <div data-col="6" class="box machine"></div> <div data-col="7" class="box machine"></div><div data-col="8" class="box machineMait"></div> <div data-col="9" class="box machineMait"></div> <div data-col="10" class="box machineMait"></div><div data-col="11" class="box analog"></div> <div data-col="12" class="box analog"></div> <div data-col="13" class="box analog"></div> </div>');
+            $row.find('[data-col="1"]').text(costConfig[i].machineName);
+            for (var j = costConfig[i].machineCosts.length - 1; j >= 0; j--) {
+                 $row.find('[data-col="2"]').prepend('<figure class="cpL">' + money_round(costConfig[i].machineCosts[j].costPerL) +'<figcaption class="inkType">' + costConfig[i].machineCosts[j].channel + '</figcaption> </figure>');
+            };
+
+            //Production metrics
+            $row.find('[data-col="3"]').text(round2(costConfig[i].machineConsumption.sqFt) + ' (' + Math.round((costConfig[i].machineConsumption.sqFt / costConfig.totalConsumption)*100) + '%)' );
+            $row.find('[data-col="4"]').text(costConfig[i].machineConsumption.time.format('h:mm'));
+
+            //Machine Values
+            if (costConfig[i].machineConsumption.machine != undefined){
+                $row.find('[data-col="5"]').html('<figure class="cpL">' + round2(toLiter(costConfig[i].machineConsumption.machine.totalCMYK)) +'<figcaption class="inkType">' + money_round(costConfig[i].machineConsumption.machine.totalCMYK * costConfig[i].machineCosts[0].costPerML) + '<br /> Colors </figcaption> </figure>');
+                if (costConfig[i].machineConsumption.machine.totalWhite != undefined){
+                    $row.find('[data-col="5"]').append('<figure class="cpL">' + round2(toLiter(costConfig[i].machineConsumption.machine.totalWhite)) +'<figcaption class="inkType">' + money_round(costConfig[i].machineConsumption.machine.totalWhite * costConfig[i].machineCosts[1].costPerML) + '<br /> White </figcaption> </figure>');
+                }
+                $row.find('[data-col="6"]').text(round2(costConfig[i].machineConsumption.machine.mlSqft));
+                $row.find('[data-col="7"]').text(money_round(costConfig[i].machineConsumption.machine.costSqFt, 3));
+            }
+            else {
+                $row.find('[data-col="5"]').addClass('white');
+                $row.find('[data-col="6"]').addClass('white');
+                $row.find('[data-col="7"]').addClass('white');
+            }
+            //Machine Mait Values -- FBs
+            if (costConfig[i].machineConsumption.machineMait != undefined) {
+                $row.find('[data-col="8"]').html('<figure class="cpL">' + round2(toLiter(costConfig[i].machineConsumption.machineMait.totalCMYK)) +'<figcaption class="inkType">' + money_round(costConfig[i].machineConsumption.machineMait.totalCMYK * costConfig[i].machineCosts[0].costPerML) + '<br /> Colors </figcaption> </figure>');
+                if (costConfig[i].machineConsumption.machineMait.totalWhite != undefined){
+                    $row.find('[data-col="8"]').append('<figure class="cpL">' + round2(toLiter(costConfig[i].machineConsumption.machineMait.totalWhite)) +'<figcaption class="inkType">' + money_round(costConfig[i].machineConsumption.machineMait.totalWhite * costConfig[i].machineCosts[1].costPerML) + '<br /> White </figcaption> </figure>');
+                }
+                $row.find('[data-col="9"]').text(round2(costConfig[i].machineConsumption.machineMait.mlSqft));
+                $row.find('[data-col="10"]').text(money_round(costConfig[i].machineConsumption.machineMait.costSqFt, 3));
+            }
+            else {
+                $row.find('[data-col="8"]').addClass('white');
+                $row.find('[data-col="9"]').addClass('white');
+                $row.find('[data-col="10"]').addClass('white');
+            }
+            //Human Values
+                $row.find('[data-col="11"]').html('<figure class="cpL">' + round2(toLiter(costConfig[i].machineConsumption.human.totalCMYK)) +'<figcaption class="inkType">' + money_round(costConfig[i].machineConsumption.human.totalCMYK * costConfig[i].machineCosts[0].costPerML) + '<br /> Colors </figcaption> </figure>');
+                if (costConfig[i].machineConsumption.human.totalWhite != undefined){
+                    $row.find('[data-col="11"]').append('<figure class="cpL">' + round2(toLiter(costConfig[i].machineConsumption.human.totalWhite)) +'<figcaption class="inkType">' + money_round(costConfig[i].machineConsumption.human.totalWhite * costConfig[i].machineCosts[1].costPerML) + '<br /> White </figcaption> </figure>');
+                }
+            $row.find('[data-col="12"]').text(round2(costConfig[i].machineConsumption.human.mlSqft));
+            $row.find('[data-col="13"]').text(money_round(costConfig[i].machineConsumption.human.costSqFt, 3));
+            $('.boxer').append($row);
+        };
+    });
+
+$('.downloadExcel').click( function(i) { window.location.assign('resources/inkMetrics/InkUsage.xlsx') } );
+
+</script>
+
+</body>
+
+</html>
